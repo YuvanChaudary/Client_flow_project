@@ -30,81 +30,105 @@ Client Flow demonstrates how agentic architectures can transform customer operat
 
 ## Architecture — high level
 
+Below is a simplified architecture diagram. (Note: diagram uses GitHub-friendly Mermaid identifiers and plain labels to ensure rendering.)
+
 ```mermaid
 flowchart LR
-  subgraph ONPREM_CLOUD["User & Hosting"]
-    U[User / Agent Interface] -->|UI / API| FE[Frontend (React)]
-    FE -->|HTTP / WS| API[Gateway / Demo Server]
+  subgraph USER_HOST[User_And_Hosting]
+    U[User Interface]
+    FE[Frontend]
+    U --> FE
+    FE --> API[Demo Server]
   end
 
-  subgraph AGENT["Agent Runtime"]
-    API --> Intent[Intent Detector]
+  subgraph AGENT[Agent_Runtime]
+    API --> Intent[Intent_Detector]
     Intent --> Planner[Planner]
-    Planner --> Executor[Executor / Orchestrator]
-    Executor --> Tools[Tool Adapters]
-    Tools --> Audit[Audit & Validator]
+    Planner --> Executor[Executor]
+    Executor --> Tools[Tool_Adapters]
+    Tools --> Audit[Audit_Validator]
     Audit --> FE
   end
 
-  subgraph TOOLS["External Integrations"]
-    Tools --> CRM[CRM]
-    Tools --> Jira[Jira]
-    Tools --> SN[ServiceNow]
-    Tools --> Docs[Document Store]
-    Tools --> Finance[Finance System]
+  subgraph INTEGRATIONS[External_Integrations]
+    CRM[CRM]
+    Jira[Jira]
+    SN[ServiceNow]
+    Docs[Document_Store]
+    Finance[Finance_System]
+    Tools --> CRM
+    Tools --> Jira
+    Tools --> SN
+    Tools --> Docs
+    Tools --> Finance
   end
 
-  API --> Tests[Test Harness]
+  API --> Tests[Test_Harness]
 ```
 
 Notes
-- The Planner composes a sequence of tool actions; the Executor runs them with validators and produces an auditable trace saved by the Audit component.
-- Tool adapters are intentionally thin: they encapsulate API specifics and mocking for the demo/test harness.
+- Planner composes ordered steps; Executor runs them and the Audit component records an execution trace for observability and debugging.
+- Tool adapters encapsulate external API specifics and the demo includes mocked connectors for safe local demos.
 
 ---
 
-## User → System Flow (sequence)
+## User Flow (detailed)
+
+This user flow is ideal to walk a recruiter through in a live demo or recorded GIF.
+
+1. User opens the assistant UI and types a request (e.g., prepare customer invoice).
+2. Frontend sends the request to the demo gateway with contextual metadata.
+3. Server runs intent classification and entity extraction.
+4. Planner generates a deterministic plan (sequence of steps) to satisfy the intent.
+5. Executor runs steps using Tool Adapters; each action is validated and recorded.
+6. Audit stores the execution trace and result summaries.
+7. Frontend displays the plan, step-by-step execution progress and final advisory.
+
+Sequence diagram (plain labels for compatibility)
 
 ```mermaid
 sequenceDiagram
-  participant U as User
-  participant F as Frontend
-  participant S as Server
-  participant I as Intent
-  participant P as Planner
-  participant E as Executor
-  participant T as Tools
-  participant A as Audit
+  participant User
+  participant Frontend
+  participant Server
+  participant Intent
+  participant Planner
+  participant Executor
+  participant Tools
+  participant Audit
 
-  U->>F: Ask assistant to "prepare customer invoice"
-  F->>S: POST /assist {context}
-  S->>I: classify intent
-  I-->>S: intent + entities
-  S->>P: generate plan
-  P-->>S: plan (steps)
-  S->>E: execute plan
-  E->>T: call adapters (CRM, finance)
-  T-->>E: results
-  E->>A: audit trace
-  A-->>F: UI-ready advisory + status
-  F-->>U: display actions & results
+  User->>Frontend: submit request to prepare invoice
+  Frontend->>Server: send request with context
+  Server->>Intent: classify intent and extract entities
+  Intent-->>Server: return intent and entities
+  Server->>Planner: build execution plan
+  Planner-->>Server: return plan
+  Server->>Executor: execute plan
+  Executor->>Tools: call tool adapters (CRM, Finance)
+  Tools-->>Executor: adapter responses
+  Executor->>Audit: record trace and results
+  Audit-->>Frontend: return summary and status
+  Frontend-->>User: display results and audit trace
 ```
 
 ---
 
-## Project structure (key files)
+## Project structure (explicit)
 
-- server/
-  - agents/        — intent, planner, executor, validator, audit
-  - tools/         — CRM, Jira, ServiceNow, docs, finance adapters
-  - tests/         — unit & E2E tests (planner, intent, integrations)
-  - server.ts      — demo gateway / server runner
-- src/             — React UI and components (AIAssistant, Dashboard, VerificationHub)
-- docs/            — architecture notes and supporting materials
-- package.json     — build & dev scripts
-- vite.config.ts   — frontend config
+Top-level layout (key folders and purpose):
 
-For full tree, review repository files or open docs/architecture.md for diagrams and rationale.
+- server/                 — Agent runtime, agents, adapters and test harness
+  - agents/               — intent, planner, executor, validator, audit
+  - tools/                — connectors: crm.ts, jira.ts, servicenow.ts, finance.ts, documents.ts
+  - tests/                — unit & E2E tests for planner, intent, integrations
+  - server.ts             — demo gateway and minimal server runner
+- src/                    — React frontend (AIAssistant, Dashboard, VerificationHub, etc.)
+- docs/                   — architecture.md and supporting design notes
+- package.json            — npm scripts (dev, build, test)
+- vite.config.ts          — frontend config for Vite
+- .env.example            — template env file for local keys (do not commit secrets)
+
+Use this map in a recruiter demo to point attention quickly to the planner, executor and audit folders.
 
 ---
 
@@ -130,15 +154,16 @@ Local dev (frontend + server)
    # Start frontend dev server
    npm run dev
 
-   # In another terminal, start the demo gateway (if you want the server runner)
+   # In another terminal, start the demo gateway
    node server.ts
 
 4. Run tests
 
    npm test
 
-Notes
-- For a recruiter demo: run the frontend, open AIAssistant and use the example scenarios in src/initialData.ts to showcase flows quickly.
+Notes for demo
+- Use the sample scenarios in src/initialData.ts to trigger rich planner outputs quickly.
+- Open server logs to show execution traces and the audit output for transparency.
 
 ---
 
@@ -146,7 +171,7 @@ Notes
 
 - Launch the UI and trigger a sample flow: show the planner’s generated steps and the audit trace.
 - Run unit tests (server/tests) to demonstrate code quality and test coverage.
-- Open docs/architecture.md and walk through the component responsibilities.
+- Open docs/architecture.md and walk through component responsibilities.
 - Show the mock integrations (CRM/Jira) and how the executor composes actions.
 - Explain safety: validators prevent unsafe actions and every execution produces an auditable record.
 
@@ -160,7 +185,7 @@ Suggested talking points
 ## How to impress further (recommended additions)
 
 - Add CI with badge (GitHub Actions) to show build/tests passing.
-- Record a 60–90s demo video GIF and embed it at the top of the README.
+- Record a short demo GIF and embed it at the top of the README.
 - Add a short case study in docs/ showing a real scenario and metrics (time saved, actions automated).
 
 ---
